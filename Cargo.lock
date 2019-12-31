@@ -37,6 +37,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "71938f30533e4d95a6d17aa530939da3842c2ab6f4f84b9dae68447e4129f74a"
 
 [[package]]
+name = "async-compression"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c5c52622726d68ec35fec88edfb4ccb862d4f3b3bfa4af2f45142e69ef9b220"
+dependencies = [
+ "bytes 0.5.3",
+ "flate2",
+ "futures-core",
+ "memchr",
+ "pin-project-lite",
+]
+
+[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -122,6 +135,7 @@ checksum = "cf1de2fe8c75bc145a2f577add951f8134889b4795d47466a54a5c846d691693"
 name = "bitwarden_rs"
 version = "1.0.0"
 dependencies = [
+ "bytes 0.5.3",
  "chashmap",
  "chrono",
  "data-encoding",
@@ -148,7 +162,7 @@ dependencies = [
  "percent-encoding 2.1.0",
  "quoted_printable",
  "regex",
- "reqwest",
+ "reqwest 0.10.1",
  "ring",
  "rmpv",
  "rocket",
@@ -158,7 +172,7 @@ dependencies = [
  "serde_json",
  "soup",
  "syslog",
- "tokio 0.2.6",
+ "tokio 0.2.9",
  "u2f",
  "uuid 0.8.1",
  "ws",
@@ -1182,6 +1196,7 @@ dependencies = [
  "httparse",
  "itoa",
  "log 0.4.8",
+ "net2",
  "pin-project",
  "time",
  "tokio 0.2.9",
@@ -1200,6 +1215,19 @@ dependencies = [
  "hyper 0.12.35",
  "native-tls",
  "tokio-io",
+]
+
+[[package]]
+name = "hyper-tls"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3adcd308402b9553630734e9c36b77a7e48b3821251ca2493e8cd596763aafaa"
+dependencies = [
+ "bytes 0.5.3",
+ "hyper 0.13.1",
+ "native-tls",
+ "tokio 0.2.9",
+ "tokio-tls",
 ]
 
 [[package]]
@@ -2344,14 +2372,14 @@ dependencies = [
  "futures 0.1.29",
  "http 0.1.21",
  "hyper 0.12.35",
- "hyper-tls",
+ "hyper-tls 0.3.2",
  "log 0.4.8",
  "mime 0.3.16",
  "mime_guess 2.0.1",
  "native-tls",
  "serde",
  "serde_json",
- "serde_urlencoded",
+ "serde_urlencoded 0.5.5",
  "time",
  "tokio 0.1.22",
  "tokio-executor",
@@ -2360,6 +2388,43 @@ dependencies = [
  "tokio-timer",
  "url 1.7.2",
  "uuid 0.7.4",
+ "winreg",
+]
+
+[[package]]
+name = "reqwest"
+version = "0.10.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0e798e19e258bf6c30a304622e3e9ac820e483b06a1857a026e1f109b113fe4"
+dependencies = [
+ "async-compression",
+ "base64 0.11.0",
+ "bytes 0.5.3",
+ "encoding_rs",
+ "futures-core",
+ "futures-util",
+ "http 0.2.0",
+ "http-body 0.3.1",
+ "hyper 0.13.1",
+ "hyper-tls 0.4.1",
+ "js-sys",
+ "lazy_static",
+ "log 0.4.8",
+ "mime 0.3.16",
+ "mime_guess 2.0.1",
+ "native-tls",
+ "percent-encoding 2.1.0",
+ "pin-project-lite",
+ "serde",
+ "serde_json",
+ "serde_urlencoded 0.6.1",
+ "time",
+ "tokio 0.2.9",
+ "tokio-tls",
+ "url 2.1.1",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
  "winreg",
 ]
 
@@ -2635,6 +2700,18 @@ dependencies = [
  "itoa",
  "serde",
  "url 1.7.2",
+]
+
+[[package]]
+name = "serde_urlencoded"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ec5d77e2d4c73717816afac02670d5c4f534ea95ed430442cad02e7a6e32c97"
+dependencies = [
+ "dtoa",
+ "itoa",
+ "serde",
+ "url 2.1.1",
 ]
 
 [[package]]
@@ -3071,6 +3148,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-tls"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7bde02a3a5291395f59b06ec6945a3077602fac2b07eeeaf0dee2122f3619828"
+dependencies = [
+ "native-tls",
+ "tokio 0.2.9",
+]
+
+[[package]]
 name = "tokio-util"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3322,6 +3409,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5205e9afdf42282b192e2310a5b463a6d1c1d774e30dc3c791ac37ab42d2616c"
 dependencies = [
  "cfg-if",
+ "serde",
+ "serde_json",
  "wasm-bindgen-macro",
 ]
 
@@ -3338,6 +3427,18 @@ dependencies = [
  "quote 1.0.2",
  "syn 1.0.13",
  "wasm-bindgen-shared",
+]
+
+[[package]]
+name = "wasm-bindgen-futures"
+version = "0.4.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8bbdd49e3e28b40dec6a9ba8d17798245ce32b019513a845369c641b275135d9"
+dependencies = [
+ "cfg-if",
+ "js-sys",
+ "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]
@@ -3529,7 +3630,7 @@ dependencies = [
  "futures 0.1.29",
  "hmac 0.7.1",
  "rand 0.6.5",
- "reqwest",
+ "reqwest 0.9.24",
  "sha-1 0.8.2",
  "subtle 2.2.2",
  "threadpool",
