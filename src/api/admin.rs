@@ -2,7 +2,7 @@ use serde_json::Value;
 use std::process::Command;
 
 use rocket::http::{Cookie, Cookies, SameSite};
-use rocket::request::{self, FlashMessage, Form, FromRequest, Request};
+use rocket::request::{self, FlashMessage, Form, FromRequestAsync, Request};
 use rocket::response::{content::Html, Flash, Redirect};
 use rocket::{Outcome, Route};
 use rocket_contrib::json::Json;
@@ -245,33 +245,35 @@ fn backup_db(_token: AdminToken) -> EmptyResult {
 
 pub struct AdminToken {}
 
-impl<'a, 'r> FromRequest<'a, 'r> for AdminToken {
+impl<'a, 'r> FromRequestAsync<'a, 'r> for AdminToken {
     type Error = &'static str;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
-        if CONFIG.disable_admin_token() {
-            Outcome::Success(AdminToken {})
-        } else {
-            let mut cookies = request.cookies();
+    fn from_request(request: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
+        Box::pin(async move {
+            if CONFIG.disable_admin_token() {
+                Outcome::Success(AdminToken {})
+            } else {
+                let mut cookies = request.cookies();
 
-            let access_token = match cookies.get(COOKIE_NAME) {
-                Some(cookie) => cookie.value(),
-                None => return Outcome::Forward(()), // If there is no cookie, redirect to login
-            };
+                let access_token = match cookies.get(COOKIE_NAME) {
+                    Some(cookie) => cookie.value(),
+                    None => return Outcome::Forward(()), // If there is no cookie, redirect to login
+                };
 
-            let ip = match request.guard::<ClientIp>() {
-                Outcome::Success(ip) => ip.ip,
-                _ => err_handler!("Error getting Client IP"),
-            };
+                let ip = match ClientIp::from_request(&request).await {
+                    Outcome::Success(ip) => ip.ip,
+                    _ => err_handler!("Error getting Client IP"),
+                };
 
-            if decode_admin(access_token).is_err() {
-                // Remove admin cookie
-                cookies.remove(Cookie::named(COOKIE_NAME));
-                error!("Invalid or expired admin JWT. IP: {}.", ip);
-                return Outcome::Forward(());
+                if decode_admin(access_token).is_err() {
+                    // Remove admin cookie
+                    cookies.remove(Cookie::named(COOKIE_NAME));
+                    error!("Invalid or expired admin JWT. IP: {}.", ip);
+                    return Outcome::Forward(());
+                }
+
+                Outcome::Success(AdminToken {})
             }
-
-            Outcome::Success(AdminToken {})
-        }
+        })
     }
 }

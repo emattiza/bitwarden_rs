@@ -194,6 +194,7 @@ impl<'r> Responder<'r> for Error {
                 .header(ContentType::JSON)
                 .sized_body(Cursor::new(format!("{}", self)))
                 .ok()
+                .await
         })
     }
 }

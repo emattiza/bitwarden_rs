@@ -213,7 +213,7 @@ pub fn generate_admin_claims() -> AdminJWTClaims {
 //
 // Bearer token authentication
 //
-use rocket::request::{self, FromRequest, Request};
+use rocket::request::{self, FromRequestAsync, Request};
 use rocket::Outcome;
 
 use crate::db::models::{Device, User, UserOrgStatus, UserOrgType, UserOrganization};
@@ -225,78 +225,80 @@ pub struct Headers {
     pub user: User,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for Headers {
+impl<'a, 'r> FromRequestAsync<'a, 'r> for Headers {
     type Error = &'static str;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
-        let headers = request.headers();
+    fn from_request(request: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
+        Box::pin(async move {
+            let headers = request.headers();
 
-        // Get host
-        let host = if CONFIG.domain_set() {
-            CONFIG.domain()
-        } else if let Some(referer) = headers.get_one("Referer") {
-            referer.to_string()
-        } else {
-            // Try to guess from the headers
-            use std::env;
-
-            let protocol = if let Some(proto) = headers.get_one("X-Forwarded-Proto") {
-                proto
-            } else if env::var("ROCKET_TLS").is_ok() {
-                "https"
+            // Get host
+            let host = if CONFIG.domain_set() {
+                CONFIG.domain()
+            } else if let Some(referer) = headers.get_one("Referer") {
+                referer.to_string()
             } else {
-                "http"
+                // Try to guess from the headers
+                use std::env;
+
+                let protocol = if let Some(proto) = headers.get_one("X-Forwarded-Proto") {
+                    proto
+                } else if env::var("ROCKET_TLS").is_ok() {
+                    "https"
+                } else {
+                    "http"
+                };
+
+                let host = if let Some(host) = headers.get_one("X-Forwarded-Host") {
+                    host
+                } else if let Some(host) = headers.get_one("Host") {
+                    host
+                } else {
+                    ""
+                };
+
+                format!("{}://{}", protocol, host)
             };
 
-            let host = if let Some(host) = headers.get_one("X-Forwarded-Host") {
-                host
-            } else if let Some(host) = headers.get_one("Host") {
-                host
-            } else {
-                ""
-            };
-
-            format!("{}://{}", protocol, host)
-        };
-
-        // Get access_token
-        let access_token: &str = match headers.get_one("Authorization") {
-            Some(a) => match a.rsplit("Bearer ").next() {
-                Some(split) => split,
+            // Get access_token
+            let access_token: &str = match headers.get_one("Authorization") {
+                Some(a) => match a.rsplit("Bearer ").next() {
+                    Some(split) => split,
+                    None => err_handler!("No access token provided"),
+                },
                 None => err_handler!("No access token provided"),
-            },
-            None => err_handler!("No access token provided"),
-        };
+            };
 
-        // Check JWT token is valid and get device and user from it
-        let claims = match decode_login(access_token) {
-            Ok(claims) => claims,
-            Err(_) => err_handler!("Invalid claim"),
-        };
+            // Check JWT token is valid and get device and user from it
+            let claims = match decode_login(access_token) {
+                Ok(claims) => claims,
+                Err(_) => err_handler!("Invalid claim"),
+            };
 
-        let device_uuid = claims.device;
-        let user_uuid = claims.sub;
+            let device_uuid = claims.device;
+            let user_uuid = claims.sub;
 
-        let conn = match request.guard::<DbConn>() {
-            Outcome::Success(conn) => conn,
-            _ => err_handler!("Error getting DB"),
-        };
+            let conn = match DbConn::from_request(&request).await {
+                Outcome::Success(conn) => conn,
+                _ => err_handler!("Error getting DB"),
+            };
 
-        let device = match Device::find_by_uuid(&device_uuid, &conn) {
-            Some(device) => device,
-            None => err_handler!("Invalid device id"),
-        };
+            let device = match Device::find_by_uuid(&device_uuid, &conn) {
+                Some(device) => device,
+                None => err_handler!("Invalid device id"),
+            };
 
-        let user = match User::find_by_uuid(&user_uuid, &conn) {
-            Some(user) => user,
-            None => err_handler!("Device has no user associated"),
-        };
+            let user = match User::find_by_uuid(&user_uuid, &conn) {
+                Some(user) => user,
+                None => err_handler!("Device has no user associated"),
+            };
 
-        if user.security_stamp != claims.sstamp {
-            err_handler!("Invalid security stamp")
-        }
+            if user.security_stamp != claims.sstamp {
+                err_handler!("Invalid security stamp")
+            }
 
-        Outcome::Success(Headers { host, device, user })
+            Outcome::Success(Headers { host, device, user })
+        })
     }
 }
 
@@ -307,52 +309,49 @@ pub struct OrgHeaders {
     pub org_user_type: UserOrgType,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for OrgHeaders {
+impl<'a, 'r> FromRequestAsync<'a, 'r> for OrgHeaders {
     type Error = &'static str;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
-        match request.guard::<Headers>() {
-            Outcome::Forward(_) => Outcome::Forward(()),
-            Outcome::Failure(f) => Outcome::Failure(f),
-            Outcome::Success(headers) => {
-                // org_id is expected to be the second param ("/organizations/<org_id>")
-                match request.get_param::<String>(1) {
-                    Some(Ok(org_id)) => {
-                        let conn = match request.guard::<DbConn>() {
-                            Outcome::Success(conn) => conn,
-                            _ => err_handler!("Error getting DB"),
-                        };
+    fn from_request(request: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
+        Box::pin(async move {
+            let headers = try_outcome!(Headers::from_request(&request).await);
+            // org_id is expected to be the second param ("/organizations/<org_id>")
+            match request.get_param::<String>(1) {
+                Some(Ok(org_id)) => {
+                    let conn = match DbConn::from_request(&request).await {
+                        Outcome::Success(conn) => conn,
+                        _ => err_handler!("Error getting DB"),
+                    };
 
-                        let user = headers.user;
-                        let org_user = match UserOrganization::find_by_user_and_org(&user.uuid, &org_id, &conn) {
-                            Some(user) => {
-                                if user.status == UserOrgStatus::Confirmed as i32 {
-                                    user
-                                } else {
-                                    err_handler!("The current user isn't confirmed member of the organization")
-                                }
+                    let user = headers.user;
+                    let org_user = match UserOrganization::find_by_user_and_org(&user.uuid, &org_id, &conn) {
+                        Some(user) => {
+                            if user.status == UserOrgStatus::Confirmed as i32 {
+                                user
+                            } else {
+                                err_handler!("The current user isn't confirmed member of the organization")
                             }
-                            None => err_handler!("The current user isn't member of the organization"),
-                        };
+                        }
+                        None => err_handler!("The current user isn't member of the organization"),
+                    };
 
-                        Outcome::Success(Self {
-                            host: headers.host,
-                            device: headers.device,
-                            user,
-                            org_user_type: {
-                                if let Some(org_usr_type) = UserOrgType::from_i32(org_user.atype) {
-                                    org_usr_type
-                                } else {
-                                    // This should only happen if the DB is corrupted
-                                    err_handler!("Unknown user type in the database")
-                                }
-                            },
-                        })
-                    }
-                    _ => err_handler!("Error getting the organization id"),
+                    Outcome::Success(Self {
+                        host: headers.host,
+                        device: headers.device,
+                        user,
+                        org_user_type: {
+                            if let Some(org_usr_type) = UserOrgType::from_i32(org_user.atype) {
+                                org_usr_type
+                            } else {
+                                // This should only happen if the DB is corrupted
+                                err_handler!("Unknown user type in the database")
+                            }
+                        },
+                    })
                 }
+                _ => err_handler!("Error getting the organization id"),
             }
-        }
+        })
     }
 }
 
@@ -363,26 +362,23 @@ pub struct AdminHeaders {
     pub org_user_type: UserOrgType,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for AdminHeaders {
+impl<'a, 'r> FromRequestAsync<'a, 'r> for AdminHeaders {
     type Error = &'static str;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
-        match request.guard::<OrgHeaders>() {
-            Outcome::Forward(_) => Outcome::Forward(()),
-            Outcome::Failure(f) => Outcome::Failure(f),
-            Outcome::Success(headers) => {
-                if headers.org_user_type >= UserOrgType::Admin {
-                    Outcome::Success(Self {
-                        host: headers.host,
-                        device: headers.device,
-                        user: headers.user,
-                        org_user_type: headers.org_user_type,
-                    })
-                } else {
-                    err_handler!("You need to be Admin or Owner to call this endpoint")
-                }
+    fn from_request(request: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
+        Box::pin(async move {
+            let headers = try_outcome!(OrgHeaders::from_request(&request).await);
+            if headers.org_user_type >= UserOrgType::Admin {
+                Outcome::Success(Self {
+                    host: headers.host,
+                    device: headers.device,
+                    user: headers.user,
+                    org_user_type: headers.org_user_type,
+                })
+            } else {
+                err_handler!("You need to be Admin or Owner to call this endpoint")
             }
-        }
+        })
     }
 }
 
@@ -392,25 +388,22 @@ pub struct OwnerHeaders {
     pub user: User,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for OwnerHeaders {
+impl<'a, 'r> FromRequestAsync<'a, 'r> for OwnerHeaders {
     type Error = &'static str;
 
-    fn from_request(request: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
-        match request.guard::<OrgHeaders>() {
-            Outcome::Forward(_) => Outcome::Forward(()),
-            Outcome::Failure(f) => Outcome::Failure(f),
-            Outcome::Success(headers) => {
-                if headers.org_user_type == UserOrgType::Owner {
-                    Outcome::Success(Self {
-                        host: headers.host,
-                        device: headers.device,
-                        user: headers.user,
-                    })
-                } else {
-                    err_handler!("You need to be Owner to call this endpoint")
-                }
+    fn from_request(request: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
+        Box::pin(async move {
+            let headers = try_outcome!(OrgHeaders::from_request(&request).await);
+            if headers.org_user_type == UserOrgType::Owner {
+                Outcome::Success(Self {
+                    host: headers.host,
+                    device: headers.device,
+                    user: headers.user,
+                })
+            } else {
+                err_handler!("You need to be Owner to call this endpoint")
             }
-        }
+        })
     }
 }
 
@@ -423,28 +416,30 @@ pub struct ClientIp {
     pub ip: IpAddr,
 }
 
-impl<'a, 'r> FromRequest<'a, 'r> for ClientIp {
+impl<'a, 'r> FromRequestAsync<'a, 'r> for ClientIp {
     type Error = ();
 
-    fn from_request(req: &'a Request<'r>) -> request::Outcome<Self, Self::Error> {
-        let ip = if CONFIG._ip_header_enabled() {
-            req.headers().get_one(&CONFIG.ip_header()).and_then(|ip| {
-                match ip.find(',') {
-                    Some(idx) => &ip[..idx],
-                    None => ip,
-                }
-                .parse()
-                .map_err(|_| warn!("'{}' header is malformed: {}", CONFIG.ip_header(), ip))
-                .ok()
-            })
-        } else {
-            None
-        };
+    fn from_request(req: &'a Request<'r>) -> request::FromRequestFuture<'a, Self, Self::Error> {
+        Box::pin(async move {
+            let ip = if CONFIG._ip_header_enabled() {
+                req.headers().get_one(&CONFIG.ip_header()).and_then(|ip| {
+                    match ip.find(',') {
+                        Some(idx) => &ip[..idx],
+                        None => ip,
+                    }
+                    .parse()
+                    .map_err(|_| warn!("'{}' header is malformed: {}", CONFIG.ip_header(), ip))
+                    .ok()
+                })
+            } else {
+                None
+            };
 
-        let ip = ip
-            .or_else(|| req.remote().map(|r| r.ip()))
-            .unwrap_or_else(|| "0.0.0.0".parse().unwrap());
+            let ip = ip
+                .or_else(|| req.remote().map(|r| r.ip()))
+                .unwrap_or_else(|| "0.0.0.0".parse().unwrap());
 
-        Outcome::Success(ClientIp { ip })
+            Outcome::Success(ClientIp { ip })
+        })
     }
 }
