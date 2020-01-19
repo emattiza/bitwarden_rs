@@ -78,7 +78,7 @@ oath = "0.10.2"
 data-encoding = "2.1.2"
 
 # JWT library
-jsonwebtoken = "7.0.0"
+jsonwebtoken = "7.0.0-alpha.2"
 
 # U2F library
 u2f = "0.2.0"
@@ -131,7 +131,3 @@ lettre_email = { git = 'https://github.com/lettre/lettre', rev = '24d694db3be017
 
 # For favicon extraction from main website
 data-url = { git = 'https://github.com/servo/rust-url', package="data-url", rev = '7f1bd6ce1c2fde599a757302a843a60e714c5f72' }
-
-# Ring 0.16
-jsonwebtoken = { git = 'https://github.com/Keats/jsonwebtoken', rev = '639915f25b4b0457106f2a8a04249ab2758900c6' }
-u2f = { git = 'https://github.com/dani-garcia/u2f-rs', rev = '8efe11d67666eb727f960733c909923c88e62c2e' }

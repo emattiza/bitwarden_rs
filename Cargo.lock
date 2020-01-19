@@ -1098,15 +1098,16 @@ dependencies = [
 
 [[package]]
 name = "jsonwebtoken"
-version = "7.0.0"
-source = "git+https://github.com/Keats/jsonwebtoken?rev=639915f25b4b0457106f2a8a04249ab2758900c6#639915f25b4b0457106f2a8a04249ab2758900c6"
+version = "7.0.0-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a3e1643b14858e5cf385fe43675ffc4d5b5a5abc3342acaab7b08a058d64e31b"
 dependencies = [
- "base64 0.10.1",
- "chrono",
+ "base64 0.11.0",
+ "pem",
  "ring",
  "serde",
- "serde_derive",
  "serde_json",
+ "simple_asn1",
 ]
 
 [[package]]
@@ -1496,6 +1497,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "num-bigint"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f6f115de20ad793e857f76da2563ff4a09fbcfd6fe93cca0c5d996ab5f3ee38d"
+dependencies = [
+ "autocfg 1.0.0",
+ "num-integer",
+ "num-traits",
+]
+
+[[package]]
 name = "num-derive"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1662,6 +1674,17 @@ dependencies = [
  "syn 0.15.44",
  "version_check 0.1.5",
  "yansi 0.4.0",
+]
+
+[[package]]
+name = "pem"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a1581760c757a756a41f0ee3ff01256227bdf64cb752839779b95ffb01c59793"
+dependencies = [
+ "base64 0.11.0",
+ "lazy_static",
+ "regex",
 ]
 
 [[package]]
@@ -2386,6 +2409,9 @@ name = "serde"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "414115f25f818d7dfccec8ee535d76949ae78584fc4f79a6f45a904bf8ab4449"
+dependencies = [
+ "serde_derive",
+]
 
 [[package]]
 name = "serde_derive"
@@ -2457,6 +2483,17 @@ dependencies = [
  "digest-buffer",
  "fake-simd",
  "generic-array 0.7.3",
+]
+
+[[package]]
+name = "simple_asn1"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2b25ecba7165254f0c97d6c22a64b1122a03634b18d20a34daf21e18f892e618"
+dependencies = [
+ "chrono",
+ "num-bigint",
+ "num-traits",
 ]
 
 [[package]]
@@ -2763,19 +2800,18 @@ checksum = "6d2783fe2d6b8c1101136184eb41be8b1ad379e4657050b8aaff0c79ee7575f9"
 [[package]]
 name = "u2f"
 version = "0.2.0"
-source = "git+https://github.com/dani-garcia/u2f-rs?rev=8efe11d67666eb727f960733c909923c88e62c2e#8efe11d67666eb727f960733c909923c88e62c2e"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2f285392366190c4d46823458f4543ac0f35174759c78e80c5baa39e1f7aa4f"
 dependencies = [
  "base64 0.11.0",
  "byteorder",
  "bytes 0.4.12",
  "chrono",
- "ring",
+ "openssl",
  "serde",
  "serde_derive",
  "serde_json",
  "time",
- "untrusted",
- "webpki",
 ]
 
 [[package]]
